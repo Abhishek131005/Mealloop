@@ -50,7 +50,7 @@ export const deleteDonation = (id) => {
   // Real API call to delete a donation
   return api.delete(`/donations/${id}`);
 };
-export const getMyDonationHistory = () => api.get('/donations/history');
+export const getMyDonationHistory = () => api.get('/donations');
 
 // Get nearby donations with optional location parameters
 export const getNearbyDonations = (params = {}) => {

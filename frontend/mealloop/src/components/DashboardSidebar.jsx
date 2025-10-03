@@ -13,7 +13,8 @@ export default function DashboardSidebar({
   tabs = defaultTabs, 
   activeTab, 
   onTabChange = () => {}, 
-  role = "Volunteer" 
+  role = "Volunteer",
+  unreadCount = 0
 }) {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -47,12 +48,19 @@ export default function DashboardSidebar({
           <button
             key={tab.key}
             onClick={() => onTabChange && onTabChange(tab.key)}
-            className={`w-full flex items-center px-6 py-3 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition ${
+            className={`w-full flex items-center justify-between px-6 py-3 text-left text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition ${
               activeTab === tab.key ? "bg-gray-100 dark:bg-gray-700 font-semibold" : ""
             }`}
           >
-            <span className="mr-3 text-xl">{tab.icon}</span>
-            {tab.label}
+            <div className="flex items-center">
+              <span className="mr-3 text-xl">{tab.icon}</span>
+              {tab.label}
+            </div>
+            {tab.key === 'chat' && unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full min-w-[1.25rem] text-center">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
         ))}
       </nav>

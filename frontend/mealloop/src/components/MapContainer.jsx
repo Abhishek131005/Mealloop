@@ -1,46 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { LoadScript } from '@react-google-maps/api';
 import MapView from './MapView';
-
-// Define libraries to load
-const libraries = ['places'];
-
-// Global flag to track if we've attempted to load Google Maps
-let googleMapsLoading = false;
-let googleMapsLoadListeners = [];
-
-const loadGoogleMaps = (apiKey) => {
-  if (window.google && window.google.maps) {
-    return Promise.resolve();
-  }
-
-  if (googleMapsLoading) {
-    return new Promise((resolve) => {
-      googleMapsLoadListeners.push(resolve);
-    });
-  }
-
-  googleMapsLoading = true;
-
-  return new Promise((resolve, reject) => {
-    const script = document.createElement('script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async&callback=initMap`;
-    script.async = true;
-    script.defer = true;
-    script.onerror = (error) => {
-      console.error('Failed to load Google Maps API:', error);
-      reject(error);
-    };
-
-    window.initMap = () => {
-      googleMapsLoadListeners.forEach(cb => cb());
-      googleMapsLoadListeners = [];
-      resolve();
-    };
-
-    document.head.appendChild(script);
-  });
-};
 
 const MapContainer = (props) => {
   const [isLoaded, setIsLoaded] = useState(false);
@@ -120,6 +79,7 @@ const MapContainer = (props) => {
     );
   }
 
+  // MapContainer now assumes Google Maps API is loaded by App.jsx
   return <MapView {...props} />;
 };
 

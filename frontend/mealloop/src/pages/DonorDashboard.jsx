@@ -1,11 +1,14 @@
 // src/pages/DonorDashboard.jsx
 import { useEffect, useMemo, useState, useContext, useCallback } from 'react';
+import ChatWindow from '../components/ChatWindow';
+import useMessageNotifications from '../hooks/useMessageNotifications';
 import LocationPicker from '../components/LocationPicker';
 import ShelterMapPicker from '../components/ShelterMapPicker';
 import TimePicker from '../components/TimePicker';
 import { format } from 'date-fns';
 import DashboardSidebar from '../components/DashboardSidebar';
 import { GlobalContext } from '../context/GlobalContext';
+import { useNotificationContext } from '../context/NotificationContext';
 import UploadImage from '../components/UploadImage';
 import useGeolocation from '../hooks/useGeolocation';
 import useSocket from '../hooks/useSocket';
@@ -15,15 +18,21 @@ import {
 } from '../services/api';
 
 export default function DonorDashboard() {
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatDonationId, setChatDonationId] = useState(null);
+  const [chatPeer, setChatPeer] = useState(null);
+  const [chatRefreshTrigger, setChatRefreshTrigger] = useState(0);
   const [editDonation, setEditDonation] = useState(null);
   const [newDonationCount, setNewDonationCount] = useState(0);
   const [selectedDonation, setSelectedDonation] = useState(null);
   const { user, location, setLocation } = useContext(GlobalContext);
+  const { unreadCount, refreshUnreadCount } = useNotificationContext();
+  const { unreadCounts, markAsRead } = useMessageNotifications();
   const [activeTab, setActiveTab] = useState('post');
   const { pos } = useGeolocation();
   const socketRef = useSocket(); // listens to server events
-  const [donations, setDonations] = useState([]);
-  const [history, setHistory] = useState([]);
+  const [donations, setDonations] = useState([]); // active and pending
+  const [delivered, setDelivered] = useState([]); // delivered only
   const [img, setImg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isLoadingDonations, setIsLoadingDonations] = useState(true);
@@ -48,8 +57,8 @@ export default function DonorDashboard() {
     // Only fetch if we have a user
     if (!user) {
       console.log('No user found, clearing donations');
-      setDonations([]);
-      setHistory([]);
+  setDonations([]);
+  setDelivered([]);
       setIsLoadingDonations(false);
       return;
     }
@@ -75,7 +84,6 @@ export default function DonorDashboard() {
           // Ensure we have an array
           const donationsArray = Array.isArray(donations) ? donations : [donations];
           console.log(`Found ${donationsArray.length} donations for user`);
-          
           // Process the donations data
           const processedDonations = donationsArray.map(d => ({
             ...d,
@@ -87,30 +95,18 @@ export default function DonorDashboard() {
             address: d.address || 'No address provided',
             status: d.status || 'Pending',
             photoUrl: d.photoUrl || 'https://via.placeholder.com/150',
-            // Ensure donor info is properly set
             donor: d.donor || {
               _id: user.id,
               name: user.name,
               email: user.email
             }
           }));
-          
-          setDonations(processedDonations);
-          
-          // Try to fetch history (if the endpoint exists)
-          try {
-            const histRes = await getMyDonationHistory();
-            if (histRes && histRes.data) {
-              console.log(`Found ${histRes.data.length} historical donations`);
-              setHistory(histRes.data);
-            }
-          } catch (histError) {
-            console.warn('Could not load donation history (endpoint might not exist):', histError);
-            setHistory([]);
-          }
+          setDonations(processedDonations.filter(d => d.status !== 'Delivered'));
+          setDelivered(processedDonations.filter(d => d.status === 'Delivered'));
         } else {
           console.log('No donations data received');
           setDonations([]);
+          setDelivered([]);
         }
         
       } catch (e) {
@@ -366,15 +362,48 @@ export default function DonorDashboard() {
     setError(null);
   };
 
+  const handleSelectChat = (donationId, peer) => {
+    setChatDonationId(donationId);
+    setChatPeer(peer);
+    setChatOpen(true);
+  };
+
+  const handleChatClose = () => {
+    if (chatDonationId) {
+      markAsRead(chatDonationId);
+    }
+    setChatOpen(false);
+    setChatRefreshTrigger(prev => prev + 1);
+    refreshUnreadCount();
+  };
+
+  const handleMessageReceived = () => {
+    setChatRefreshTrigger(prev => prev + 1);
+  };
+
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-900">
-      <DashboardSidebar 
-        tabs={donorTabs} 
-        activeTab={activeTab} 
-        onTabChange={handleTabChange} 
-        role="Donor" 
-      />
+      {/* Sidebar for navigation and chat list */}
+      <div className="flex flex-col w-72 min-w-[18rem] border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <DashboardSidebar 
+          tabs={donorTabs} 
+          activeTab={activeTab} 
+          onTabChange={handleTabChange} 
+          role="Donor"
+          unreadCount={unreadCount}
+        />
+      </div>
       <main className="flex-1 p-8">
+        {/* Chat Window overlay */}
+        {chatOpen && chatDonationId && chatPeer && (
+          <ChatWindow
+            donationId={chatDonationId}
+            user={user}
+            peer={chatPeer}
+            onClose={handleChatClose}
+            onMessageReceived={handleMessageReceived}
+          />
+        )}
         {activeTab === "post" && (
           <div className="card mb-8">
             <h2 className="text-xl font-semibold mb-4">Post Food</h2>
@@ -462,26 +491,13 @@ export default function DonorDashboard() {
                 onClick={async () => {
                   setIsLoadingDonations(true);
                   setError(null);
-                  
                   try {
-                    // First fetch donations
                     const donRes = await getMyDonations();
-                    // The response from getMyDonations is already the data array
                     if (donRes) {
-                      setDonations(Array.isArray(donRes) ? donRes : [donRes]);
+                      const processed = Array.isArray(donRes) ? donRes : [donRes];
+                      setDonations(processed.filter(d => d.status !== 'Delivered'));
+                      setDelivered(processed.filter(d => d.status === 'Delivered'));
                     }
-                    
-                    // Then try to fetch history (but don't fail if it doesn't exist)
-                    try {
-                      const histRes = await getMyDonationHistory();
-                      if (histRes && histRes.data) {
-                        setHistory(histRes.data);
-                      }
-                    } catch (histError) {
-                      console.warn('Could not load donation history (endpoint might not exist):', histError);
-                      // Continue even if history fails
-                    }
-                    
                   } catch (e) {
                     console.error('Error refreshing donations:', e);
                     setError('Failed to refresh donations. ' + (e.response?.data?.message || e.message || ''));
@@ -503,7 +519,6 @@ export default function DonorDashboard() {
                 {isLoadingDonations ? 'Refreshing...' : 'Refresh'}
               </button>
             </div>
-            
             {isLoadingDonations ? (
               <div className="flex justify-center items-center p-8">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
@@ -544,6 +559,41 @@ export default function DonorDashboard() {
                           <span className="text-xs px-2 py-0.5 rounded bg-yellow-200 text-yellow-800">
                             {d.status || 'pending'}
                           </span>
+                          {/* Chat with Volunteer button for claimed or picked up donations (not delivered) */}
+                          {(d.status === 'Claimed' || d.status === 'Picked Up') && d.claimedBy && (
+                            <button
+                              type="button"
+                              className="ml-2 mt-2 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-medium py-1 px-3 rounded text-xs"
+                              onClick={async e => {
+                                e.stopPropagation();
+                                // Get the volunteer info directly from the donation object
+                                try {
+                                  if (d.claimedBy && d.claimedBy._id) {
+                                    setChatDonationId(d._id || d.id);
+                                    setChatPeer({
+                                      id: d.claimedBy._id,
+                                      _id: d.claimedBy._id,
+                                      name: d.claimedBy.name,
+                                      email: d.claimedBy.email
+                                    });
+                                    setChatOpen(true);
+                                  } else {
+                                    alert('Volunteer information not available. Please refresh the page.');
+                                  }
+                                } catch (err) {
+                                  console.error('Error opening chat:', err);
+                                  alert('Failed to open chat. Please try again.');
+                                }
+                              }}
+                            >
+                              Chat with Volunteer
+                              {unreadCounts[d._id] && (
+                                <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                  {unreadCounts[d._id]}
+                                </span>
+                              )}
+                            </button>
+                          )}
                         </div>
                         {d.photoUrl && <img src={d.photoUrl} alt="Food" className="h-12 w-12 rounded object-cover" />}
                         <div className="flex flex-col gap-2 ml-4">
@@ -681,7 +731,12 @@ export default function DonorDashboard() {
             {selectedDonation && (
               <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50">
                 <div className="bg-white dark:bg-gray-900 rounded-lg p-6 max-w-md w-full shadow-xl relative">
-                  <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" onClick={() => setSelectedDonation(null)}>&times;</button>
+                  <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-700" onClick={() => {
+                    setSelectedDonation(null);
+                    setChatOpen(false);
+                    setChatDonationId(null);
+                    setChatPeer(null);
+                  }}>&times;</button>
                   <h3 className="text-lg font-bold mb-2">{selectedDonation.title}</h3>
                   <img src={selectedDonation.photoUrl} alt="Food" className="w-full h-40 object-cover rounded mb-2" />
                   <p><span className="font-semibold">Quantity:</span> {selectedDonation.quantity}</p>
@@ -696,15 +751,15 @@ export default function DonorDashboard() {
         {activeTab === "history" && (
           <div className="card">
             <h2 className="text-xl font-semibold mb-4">Pickup History</h2>
-            {history.length === 0 ? (
+            {delivered.length === 0 ? (
               <p className="text-gray-500">No completed donations yet.</p>
             ) : (
               <ul className="space-y-3">
-                {history.map(h => (
+                {delivered.map(h => (
                   <li key={h.id} className="flex justify-between items-center border rounded p-3 dark:border-gray-700">
                     <div>
                       <p className="font-medium">{h.title}</p>
-                      <p className="text-xs text-gray-500">Delivered on {h.completedAt}</p>
+                      <p className="text-xs text-gray-500">Delivered on {h.deliveredAt ? new Date(h.deliveredAt).toLocaleString() : 'N/A'}</p>
                     </div>
                     <span className="text-sm px-2 py-0.5 rounded bg-green-200 text-green-800">Completed</span>
                   </li>

@@ -1,5 +1,8 @@
 // src/pages/VolunteerDashboard.jsx
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
+import { useNotificationContext } from '../context/NotificationContext';
+import useMessageNotifications from '../hooks/useMessageNotifications';
 import DashboardSidebar from '../components/DashboardSidebar';
 import MapContainer from '../components/MapContainer';
 import useGeolocation from '../hooks/useGeolocation';
@@ -11,8 +14,12 @@ import {
   getMe,
   getDeliveredDonations,
 } from '../services/api';
+import ChatWindow from '../components/ChatWindow';
 
 export default function VolunteerDashboard() {
+  const { user } = useContext(AuthContext);
+  const { unreadCount, refreshUnreadCount } = useNotificationContext();
+  const { unreadCounts, markAsRead } = useMessageNotifications();
   const { pos } = useGeolocation();
   const [nearby, setNearby] = useState([]);
   const [deliveredDonations, setDeliveredDonations] = useState([]);
@@ -20,6 +27,10 @@ export default function VolunteerDashboard() {
   const [activeTab, setActiveTab] = useState('find');
   const [selectedDonation, setSelectedDonation] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatDonationId, setChatDonationId] = useState(null);
+  const [chatPeer, setChatPeer] = useState(null);
+  const [chatRefreshTrigger, setChatRefreshTrigger] = useState(0);
   
   const center = pos ? { lat: pos.lat, lng: pos.lng } : null;
 
@@ -32,7 +43,6 @@ export default function VolunteerDashboard() {
           getNearbyDonations({ lat: pos?.lat, lng: pos?.lng }),
           getDeliveredDonations()
         ]);
-        
         setKarma(userData.data.karma || 0);
         setNearby(donationsData.data || []);
         setDeliveredDonations(deliveredData || []);
@@ -42,18 +52,17 @@ export default function VolunteerDashboard() {
         setIsLoading(false);
       }
     };
-
-    if (pos) {
+    if (pos && user) {
       fetchUserData();
     }
-  }, [pos]);
+  }, [pos, user]);
 
   // Fetch nearby donations
   const fetchDonations = useCallback(async () => {
     try {
-      setIsLoading(true);
-      const res = await getNearbyDonations();
-      setNearby(Array.isArray(res.data) ? res.data : []);
+  setIsLoading(true);
+  const res = await getNearbyDonations();
+  setNearby(Array.isArray(res.data) ? res.data : []);
     } catch (error) {
       console.error('Error fetching donations:', error);
     } finally {
@@ -77,6 +86,21 @@ export default function VolunteerDashboard() {
   // Handle donation selection
   const handleDonationSelect = (donation) => {
     setSelectedDonation(donation);
+    setChatDonationId(donation._id || donation.id);
+    
+    // For volunteers, the peer is always the donor
+    if (donation.donor) {
+      const peer = {
+        id: donation.donor._id || donation.donor.id,
+        _id: donation.donor._id || donation.donor.id,
+        name: donation.donor.name,
+        email: donation.donor.email
+      };
+      setChatPeer(peer);
+      setChatOpen(true);
+    } else {
+      alert('Donor information not available. Please refresh and try again.');
+    }
   };
 
   // Handle claiming a donation
@@ -97,6 +121,17 @@ export default function VolunteerDashboard() {
             : d
         )
       );
+      // Open chat window with donor after claiming
+      setChatDonationId(donationId);
+      if (donation.donor) {
+        setChatPeer({
+          id: donation.donor._id || donation.donor.id,
+          _id: donation.donor._id || donation.donor.id,
+          name: donation.donor.name,
+          email: donation.donor.email
+        });
+      }
+      setChatOpen(true);
       setSelectedDonation(null);
       alert('Donation claimed successfully!');
     } catch (error) {
@@ -211,13 +246,41 @@ export default function VolunteerDashboard() {
 
   return (
     <div className="flex h-screen bg-gray-100 dark:bg-gray-900">
-      <DashboardSidebar 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-        karma={karma} 
-      />
-      
+      {/* Sidebar for navigation and chat list */}
+      <div className="flex flex-col w-72 min-w-[18rem] border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900">
+        <DashboardSidebar 
+          tabs={[
+            { key: "find", label: "Find Donations", icon: "🔍" },
+            { key: "active", label: "Active Pickups", icon: "🚚" },
+            { key: "history", label: "Pickup History", icon: "📜" },
+            { key: "impact", label: "My Impact", icon: "📊" }
+          ]}
+          activeTab={activeTab} 
+          onTabChange={setActiveTab} 
+          karma={karma}
+          unreadCount={unreadCount}
+        />
+      </div>
       <main className="flex-1 overflow-y-auto p-6">
+        {/* Chat Window overlay */}
+        {chatOpen && chatDonationId && chatPeer && user && (
+          <ChatWindow
+            donationId={chatDonationId}
+            user={user}
+            peer={chatPeer}
+            onClose={() => {
+              if (chatDonationId) {
+                markAsRead(chatDonationId);
+              }
+              setChatOpen(false);
+              setChatRefreshTrigger(prev => prev + 1);
+              refreshUnreadCount();
+            }}
+            onMessageReceived={() => {
+              setChatRefreshTrigger(prev => prev + 1);
+            }}
+          />
+        )}
         <div className="max-w-7xl mx-auto">
           <div className="flex justify-between items-center mb-6">
             <h1 className="text-2xl font-bold text-gray-800 dark:text-white">
@@ -227,57 +290,7 @@ export default function VolunteerDashboard() {
             </h1>
           </div>
           
-          {activeTab === 'active' && (
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-800 dark:text-white">Your Active Pickups</h2>
-              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-                {nearby
-                  .filter(donation => 
-                    donation.status === 'Claimed' || donation.status === 'Picked Up'
-                  )
-                  .map((donation) => (
-                    <div
-                      key={donation.id}
-                      className="bg-white dark:bg-gray-800 rounded-lg shadow-md overflow-hidden border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="p-4">
-                        <div className="flex justify-between items-start">
-                          <h3 className="font-semibold text-lg">{donation.title}</h3>
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            donation.status === 'Claimed' ? 'bg-blue-100 text-blue-800' :
-                            donation.status === 'Picked Up' ? 'bg-green-100 text-green-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {donation.status}
-                          </span>
-                        </div>
-                        <p className="text-gray-600 dark:text-gray-300 mt-2">
-                          <span className="font-medium">Quantity:</span> {donation.quantity}
-                        </p>
-                        {donation.pickedUpAt && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                            Picked up: {new Date(donation.pickedUpAt).toLocaleString()}
-                          </p>
-                        )}
-                        <div className="mt-4">
-                          <button
-                            onClick={() => handleDonationSelect(donation)}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-                          >
-                            View Details
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                {nearby.filter(d => d.status === 'Claimed' || d.status === 'Picked Up').length === 0 && (
-                  <div className="col-span-full text-center py-8">
-                    <p className="text-gray-500 dark:text-gray-400">No active pickups found</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Removed duplicate Active Pickups tab rendering */}
           
           {activeTab === 'find' && (
             <div className="space-y-6">
@@ -291,7 +304,6 @@ export default function VolunteerDashboard() {
                         (selectedDonation._id === donationId) || 
                         (selectedDonation.id === donationId)
                       );
-                      
                       return (
                         <div
                           key={donationId}
@@ -341,7 +353,12 @@ export default function VolunteerDashboard() {
                           {selectedDonation.title}
                         </h2>
                         <button
-                          onClick={() => setSelectedDonation(null)}
+                          onClick={() => {
+                            setSelectedDonation(null);
+                            setChatOpen(false);
+                            setChatDonationId(null);
+                            setChatPeer(null);
+                          }}
                           className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
                         >
                           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -354,16 +371,26 @@ export default function VolunteerDashboard() {
                         <div>
                           <div className="h-64 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-600 shadow-md">
                             <MapContainer 
-                              center={center} 
-                              markers={[{
-                                position: { 
-                                  lat: parseFloat(selectedDonation.latitude || selectedDonation.lat), 
-                                  lng: parseFloat(selectedDonation.longitude || selectedDonation.lng)
+                              center={selectedDonation.shelterLat && selectedDonation.shelterLng
+                                ? { lat: parseFloat(selectedDonation.shelterLat), lng: parseFloat(selectedDonation.shelterLng) }
+                                : (selectedDonation.lat && selectedDonation.lng
+                                  ? { lat: parseFloat(selectedDonation.lat), lng: parseFloat(selectedDonation.lng) }
+                                  : center)
+                              }
+                              markers={[
+                                selectedDonation.lat && selectedDonation.lng && {
+                                  position: { lat: parseFloat(selectedDonation.lat), lng: parseFloat(selectedDonation.lng) },
+                                  title: selectedDonation.title + ' (Donor)',
+                                  id: selectedDonation.id + '-donor',
+                                  icon: 'http://maps.google.com/mapfiles/ms/icons/red-dot.png'
                                 },
-                                title: selectedDonation.title,
-                                id: selectedDonation.id
-                              }]}
-                              userPosition={pos}
+                                selectedDonation.shelterLat && selectedDonation.shelterLng && {
+                                  position: { lat: parseFloat(selectedDonation.shelterLat), lng: parseFloat(selectedDonation.shelterLng) },
+                                  title: selectedDonation.title + ' (Shelter)',
+                                  id: selectedDonation.id + '-shelter',
+                                  icon: 'http://maps.google.com/mapfiles/ms/icons/blue-dot.png'
+                                }
+                              ].filter(Boolean)}
                             />
                           </div>
                           
@@ -440,12 +467,39 @@ export default function VolunteerDashboard() {
                               )}
                               
                               {selectedDonation.status === 'Claimed' && (
-                                <button
-                                  onClick={() => handleMarkPickedUp(selectedDonation)}
-                                  className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
-                                >
-                                  Mark as Picked Up
-                                </button>
+                                <>
+                                  <button
+                                    onClick={() => handleMarkPickedUp(selectedDonation)}
+                                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5 mb-2"
+                                  >
+                                    Mark as Picked Up
+                                  </button>
+                                  <button
+                                    onClick={() => {
+                                      setChatDonationId(selectedDonation._id || selectedDonation.id);
+                                      // For volunteers, the peer is always the donor
+                                      if (selectedDonation.donor) {
+                                        setChatPeer({
+                                          id: selectedDonation.donor._id,
+                                          _id: selectedDonation.donor._id,
+                                          name: selectedDonation.donor.name,
+                                          email: selectedDonation.donor.email
+                                        });
+                                        setChatOpen(true);
+                                      } else {
+                                        alert('Donor information not available. Please refresh and try again.');
+                                      }
+                                    }}
+                                    className="w-full bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-medium py-2.5 px-4 rounded-lg transition-all shadow-md hover:shadow-lg transform hover:-translate-y-0.5"
+                                  >
+                                    Chat with Donor
+                                    {unreadCounts[selectedDonation._id] && (
+                                      <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                        {unreadCounts[selectedDonation._id]}
+                                      </span>
+                                    )}
+                                  </button>
+                                </>
                               )}
                               
                               {selectedDonation.status === 'Picked Up' && (
@@ -529,10 +583,29 @@ export default function VolunteerDashboard() {
                         )}
                         <div className="mt-4">
                           <button
-                            onClick={() => handleDonationSelect(donation)}
+                            onClick={() => {
+                              // Open chat window with donor
+                              setChatDonationId(donation._id || donation.id);
+                              if (donation.donor) {
+                                setChatPeer({
+                                  id: donation.donor._id,
+                                  _id: donation.donor._id,
+                                  name: donation.donor.name,
+                                  email: donation.donor.email
+                                });
+                              }
+                              setChatOpen(true);
+                              // Also open the details modal
+                              handleDonationSelect(donation);
+                            }}
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
                           >
-                            View Details
+                            View Details & Chat
+                            {unreadCounts[donation._id] && (
+                              <span className="ml-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                                {unreadCounts[donation._id]}
+                              </span>
+                            )}
                           </button>
                         </div>
                       </div>

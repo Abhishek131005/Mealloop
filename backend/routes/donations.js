@@ -4,7 +4,9 @@ const Donation = require('../models/Donation');
 
 // GET all donations
 router.get('/', async (req, res) => {
-  const donations = await Donation.find().populate('donor', 'name email');
+  const donations = await Donation.find()
+    .populate('donor', 'name email phone')
+    .populate('claimedBy', 'name email phone');
   res.json(donations);
 });
 
@@ -15,6 +17,8 @@ router.post('/', auth, async (req, res) => {
   const donationData = { ...req.body };
   if (!donationData.donor) donationData.donor = req.user.id;
   const donation = new Donation(donationData);
+  // User model for population
+  const User = require('../models/User');
   await donation.save();
   res.status(201).json(donation);
 });
@@ -27,6 +31,19 @@ router.patch('/:id', auth, async (req, res) => {
     
     // Ensure the donation belongs to the logged-in user
     const donation = await Donation.findOne({ _id: req.params.id, donor: req.user.id });
+  router.get('/history', auth, async (req, res) => {
+    try {
+      // Find all donations by this user (as donor)
+      const donations = await Donation.find({ donor: req.user.id })
+        .populate('volunteer', 'name email')
+        .populate('donor', 'name email')
+        .sort({ createdAt: -1 });
+      res.json(donations);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: 'Server error fetching donation history' });
+    }
+  });
     
     if (!donation) {
       console.log('Donation not found or not authorized');
@@ -100,8 +117,8 @@ router.post('/:id/claim', auth, async (req, res) => {
     await donation.save();
     
     // Populate the donor and claimedBy fields for the response
-    await donation.populate('donor', 'name email');
-    await donation.populate('claimedBy', 'name email');
+  await donation.populate('donor', 'name email phone');
+  await donation.populate('claimedBy', 'name email phone');
     
     res.json({
       success: true,
@@ -124,9 +141,9 @@ router.get('/delivered', auth, async (req, res) => {
       claimedBy: req.user.id,
       status: 'Delivered' 
     })
-    .populate('donor', 'name email')
+    .populate('donor', 'name email phone')
+    .populate('claimedBy', 'name email phone')
     .sort({ deliveredAt: -1 });
-    
     res.json(donations);
   } catch (error) {
     console.error('Error fetching delivered donations:', error);
@@ -145,7 +162,8 @@ router.get('/mine', auth, async (req, res) => {
     console.log('User object:', req.user);
     
     const donations = await Donation.find({ donor: req.user.id })
-      .populate('donor', 'name email')
+      .populate('donor', 'name email phone')
+      .populate('claimedBy', 'name email phone')
       .sort({ createdAt: -1 });
       
     console.log('Found donations:', donations.length);
@@ -231,8 +249,8 @@ router.patch('/:id/pickup', auth, async (req, res) => {
     await donation.save();
     
     // Populate the donor and claimedBy fields for the response
-    await donation.populate('donor', 'name email');
-    await donation.populate('claimedBy', 'name email');
+  await donation.populate('donor', 'name email phone');
+  await donation.populate('claimedBy', 'name email phone');
     
     // Emit WebSocket event if you have WebSocket setup
     // io.emit('donation_updated', { id: donation._id, status: 'Picked Up' });
@@ -286,8 +304,8 @@ router.patch('/:id/deliver', auth, async (req, res) => {
     await donation.save();
     
     // Populate the donor and claimedBy fields for the response
-    await donation.populate('donor', 'name email');
-    await donation.populate('claimedBy', 'name email');
+  await donation.populate('donor', 'name email phone');
+  await donation.populate('claimedBy', 'name email phone');
     
     // Emit WebSocket event if you have WebSocket setup
     // io.emit('donation_updated', { id: donation._id, status: 'Delivered' });
