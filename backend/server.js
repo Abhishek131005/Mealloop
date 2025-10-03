@@ -16,6 +16,16 @@ mongoose.connect(process.env.MONGO_URI)
 
 app.get('/', (req, res) => res.send('API Running'));
 
+// Health check endpoint for deployment monitoring
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    environment: process.env.NODE_ENV || 'development'
+  });
+});
+
 const donationRoutes = require('./routes/donations');
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
