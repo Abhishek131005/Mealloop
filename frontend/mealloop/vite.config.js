@@ -20,6 +20,19 @@ export default defineConfig(({ mode }) => {
         VITE_API_BASE_URL: JSON.stringify(env.VITE_API_BASE_URL)
       }
     },
+    build: {
+      outDir: 'dist',
+      assetsDir: 'assets',
+      sourcemap: false,
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            vendor: ['react', 'react-dom'],
+            router: ['react-router-dom']
+          }
+        }
+      }
+    },
     server: {
       port: 3000,
       open: true,
@@ -32,5 +45,9 @@ export default defineConfig(({ mode }) => {
         },
       },
     },
+    preview: {
+      port: 3000,
+      host: true
+    }
   };
 });

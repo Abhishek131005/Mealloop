@@ -1,0 +1,11 @@
+{
+  "name": "mealloop-frontend-render",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "cd frontend/mealloop && npm ci && npm run build",
+    "start": "cd frontend/mealloop && npm run preview"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}

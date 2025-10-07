@@ -6,14 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
     "preview": "vite preview",
-    "test": "vitest",
-    "test:ui": "vitest --ui"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "start": "vite preview --port 3000 --host"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",

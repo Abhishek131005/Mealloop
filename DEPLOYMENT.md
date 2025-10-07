@@ -1,288 +1,184 @@
-# MealLoop Deployment Guide
+# MealLoop Deployment Guide - Render
 
-This guide covers both **Experiment 9** (CI/CD with GitHub Actions + Render/Vercel) and **Experiment 10** (Docker DevOps deployment).
+This guide will help you deploy both the frontend and backend of MealLoop to Render with GitHub Actions CI/CD.
 
-## 📋 Prerequisites
+## Prerequisites
 
-- Docker and Docker Compose installed
-- Node.js 18+ installed
-- Git installed
-- GitHub account
-- Render account (for backend)
-- Vercel account (for frontend)
+1. **GitHub Repository**: Your code should be pushed to a GitHub repository
+2. **Render Account**: Sign up at [render.com](https://render.com)
+3. **MongoDB Atlas**: Set up a MongoDB Atlas cluster for production database
+4. **Environment Variables**: Prepare all required environment variables
 
-## 🚀 Experiment 9: CI/CD Deployment with GitHub Actions + Render/Vercel
+## Backend Deployment on Render
 
-### Step 1: Repository Setup
+### Step 1: Create Backend Service on Render
 
-1. **Push your code to GitHub:**
-   ```bash
-   git add .
-   git commit -m "Add CI/CD and Docker configuration"
-   git push origin main
-   ```
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Click "New +" → "Web Service"
+3. Connect your GitHub repository
+4. Configure the service:
+   - **Name**: `mealloop-backend`
+   - **Environment**: `Node`
+   - **Region**: Choose closest to your users
+   - **Branch**: `main`
+   - **Root Directory**: `backend`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
 
-### Step 2: GitHub Secrets Configuration
+### Step 2: Set Environment Variables
 
-Go to your GitHub repository → Settings → Secrets and Variables → Actions, and add:
+In your Render backend service, go to "Environment" and add:
 
-**For CI/CD Pipeline:**
-- `MONGO_URI_TEST`: Your test MongoDB connection string
-- `JWT_SECRET`: Your JWT secret key
-- `VITE_API_BASE_URL`: Your backend URL
-
-**For Render Deployment:**
-- `RENDER_SERVICE_ID`: Your Render service ID
-- `RENDER_API_KEY`: Your Render API key
-
-**For Vercel Deployment:**
-- `VERCEL_TOKEN`: Your Vercel API token
-- `VERCEL_ORG_ID`: Your Vercel organization ID
-- `VERCEL_PROJECT_ID`: Your Vercel project ID
-
-### Step 3: Backend Deployment on Render
-
-1. **Create a new Web Service on Render:**
-   - Connect your GitHub repository
-   - Root Directory: `backend`
-   - Build Command: `npm install`
-   - Start Command: `npm start`
-
-2. **Set Environment Variables on Render:**
-   ```
-   NODE_ENV=production
-   MONGO_URI=your_mongodb_connection_string
-   JWT_SECRET=your_jwt_secret
-   FRONTEND_URL=https://your-frontend.vercel.app
-   CLOUDINARY_CLOUD_NAME=your_cloudinary_name
-   CLOUDINARY_API_KEY=your_cloudinary_key
-   CLOUDINARY_API_SECRET=your_cloudinary_secret
-   ```
-
-### Step 4: Frontend Deployment on Vercel
-
-1. **Create a new project on Vercel:**
-   - Import your GitHub repository
-   - Root Directory: `frontend/mealloop`
-   - Framework Preset: Vite
-
-2. **Set Environment Variables on Vercel:**
-   ```
-   VITE_API_BASE_URL=https://your-backend.render.com
-   ```
-
-### Step 5: Test Automatic Deployment
-
-1. Make a change to your code
-2. Push to the `main` branch
-3. Watch the GitHub Actions workflow run
-4. Verify deployments on Render and Vercel
-
----
-
-## 🐳 Experiment 10: Docker DevOps Deployment
-
-### Step 1: Environment Setup
-
-1. **Copy environment files:**
-   ```bash
-   cp .env.example .env
-   cp .env.prod.example .env.prod
-   ```
-
-2. **Update environment variables in `.env` and `.env.prod`**
-
-### Step 2: Development Deployment
-
-1. **Start development environment:**
-   ```bash
-   # Make scripts executable (Linux/Mac)
-   chmod +x scripts/deploy.sh scripts/backup.sh
-
-   # Deploy development environment
-   ./scripts/deploy.sh dev
-   
-   # OR manually:
-   docker-compose up --build -d
-   ```
-
-2. **Access your application:**
-   - Frontend: http://localhost:3000
-   - Backend: http://localhost:5000
-   - Backend Health: http://localhost:5000/health
-
-### Step 3: Production Deployment
-
-1. **Deploy production environment:**
-   ```bash
-   ./scripts/deploy.sh prod
-   
-   # OR manually:
-   docker-compose -f docker-compose.prod.yml up --build -d
-   ```
-
-2. **Monitor deployment:**
-   ```bash
-   # View logs
-   docker-compose -f docker-compose.prod.yml logs -f
-   
-   # Check container status
-   docker-compose -f docker-compose.prod.yml ps
-   ```
-
-### Step 4: Database Management
-
-1. **Create backup:**
-   ```bash
-   ./scripts/backup.sh backup
-   ```
-
-2. **List backups:**
-   ```bash
-   ./scripts/backup.sh list
-   ```
-
-3. **Restore from backup:**
-   ```bash
-   ./scripts/backup.sh restore backups/20231002_143000.tar.gz
-   ```
-
-### Step 5: Monitoring (Optional)
-
-1. **Start monitoring stack:**
-   ```bash
-   docker-compose -f docker-compose.monitoring.yml up -d
-   ```
-
-2. **Access monitoring tools:**
-   - Prometheus: http://localhost:9090
-   - Grafana: http://localhost:3001 (admin/admin123)
-
-## 🔧 Useful Commands
-
-### Docker Management
-```bash
-# View all containers
-docker ps -a
-
-# View logs for specific service
-docker logs mealloop-backend-prod
-
-# Execute command in container
-docker exec -it mealloop-backend-prod bash
-
-# Remove all stopped containers
-docker container prune
-
-# Remove unused images
-docker image prune
-
-# Full system cleanup
-docker system prune -a
+```
+NODE_ENV=production
+PORT=10000
+MONGO_URI=mongodb+srv://username:password@cluster.mongodb.net/mealloop?retryWrites=true&w=majority
+JWT_SECRET=your_super_secure_jwt_secret_here_2025_!@#$%^&*()_PRODUCTION
+FRONTEND_URL=https://your-frontend-app-name.onrender.com
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
-### Database Operations
-```bash
-# Connect to MongoDB
-docker exec -it mealloop-mongo-prod mongosh
+### Step 3: Deploy Backend
 
-# Export database
-docker exec mealloop-mongo-prod mongodump --out /tmp/backup
+1. Click "Create Web Service"
+2. Render will automatically deploy from your GitHub repository
+3. Monitor the deployment logs
+4. Once deployed, note your backend URL: `https://your-backend-app-name.onrender.com`
 
-# Import database
-docker exec mealloop-mongo-prod mongorestore /tmp/backup
+## Frontend Deployment on Render
+
+### Step 1: Create Frontend Service on Render
+
+1. Go to [Render Dashboard](https://dashboard.render.com)
+2. Click "New +" → "Static Site"
+3. Connect your GitHub repository
+4. Configure the service:
+   - **Name**: `mealloop-frontend`
+   - **Branch**: `main`
+   - **Root Directory**: `frontend/mealloop` (IMPORTANT: Set this correctly!)
+   - **Build Command**: `npm ci && npm run build`
+   - **Publish Directory**: `dist`
+   - **Node Version**: `18.20.4`
+
+### Step 2: Set Environment Variables
+
+In your Render frontend service, go to "Environment" and add:
+
+```
+NODE_VERSION=18.20.4
+VITE_API_BASE_URL=https://your-backend-app-name.onrender.com/api
+VITE_CLOUDINARY_CLOUD_NAME=ddiqp1bzn
+VITE_CLOUDINARY_UPLOAD_PRESET=Veg Biryani
+VITE_GOOGLE_MAPS_API_KEY=AIzaSyAOmY0mUFLHWgl5MCaBsGvpDucrH5mwLr8
 ```
 
-## 🛡️ Security Considerations
+### Step 3: Important Configuration Notes
 
-1. **Environment Variables:**
-   - Never commit `.env` files to Git
-   - Use strong passwords for production
-   - Rotate secrets regularly
+⚠️ **Common Issues and Solutions:**
 
-2. **Docker Security:**
-   - Run containers as non-root users
-   - Use official base images
-   - Keep images updated
-   - Scan for vulnerabilities
+1. **Root Directory**: Make sure to set `frontend/mealloop` as the root directory, NOT the repository root
+2. **Build Command**: Use `npm ci && npm run build` (NOT just `npm install && npm run build`)
+3. **Node Version**: Specify `18.20.4` in environment variables or use `.node-version` file
+4. **Publish Directory**: Must be `dist` (this is where Vite outputs the built files)
 
-3. **Network Security:**
-   - Use HTTPS in production
-   - Configure proper CORS settings
-   - Implement rate limiting
+### Step 4: Deploy Frontend
 
-## 🐛 Troubleshooting
+1. Click "Create Static Site"
+2. Monitor the deployment logs carefully
+3. If you see "Missing script: build" error, check that:
+   - Root directory is set to `frontend/mealloop`
+   - Your frontend package.json has the build script
+   - Node version is compatible (18.x recommended)
 
-### Common Issues
+### Step 5: Troubleshooting Build Issues
 
-1. **Port already in use:**
-   ```bash
-   # Kill processes using ports
-   sudo lsof -ti:3000 | xargs kill -9
-   sudo lsof -ti:5000 | xargs kill -9
+If deployment fails with "Missing script: build":
+
+1. **Check Root Directory**: Ensure it's set to `frontend/mealloop`
+2. **Verify Build Command**: Should be `npm ci && npm run build`
+3. **Check Package.json**: Verify the build script exists:
+   ```json
+   {
+     "scripts": {
+       "build": "vite build"
+     }
+   }
    ```
+4. **Node Version**: Add `NODE_VERSION=18.20.4` to environment variables
 
-2. **Database connection issues:**
-   - Check MongoDB container is running
-   - Verify connection string format
-   - Check network connectivity
+## Update Backend with Frontend URL
 
-3. **Frontend build issues:**
-   - Clear node_modules and reinstall
-   - Check environment variables
-   - Verify API endpoints
+1. Go back to your backend service on Render
+2. Update the `FRONTEND_URL` environment variable with your actual frontend URL
+3. Click "Manual Deploy" to redeploy with the new URL
 
-4. **Memory issues:**
-   ```bash
-   # Increase Docker memory limit
-   # Check Docker Desktop settings
-   ```
+## GitHub Actions Setup
 
-## 📊 Monitoring and Logs
+The GitHub Actions workflows are already configured in:
+- `.github/workflows/deploy-backend.yml`
+- `.github/workflows/deploy-frontend.yml`
 
-### Application Logs
-```bash
-# Backend logs
-docker logs mealloop-backend-prod -f
+These will:
+1. Run on every push to `main` branch
+2. Install dependencies
+3. Run tests/linting
+4. Trigger automatic deployment on Render
 
-# Frontend logs
-docker logs mealloop-frontend-prod -f
+## MongoDB Atlas Setup
 
-# Database logs
-docker logs mealloop-mongo-prod -f
-```
+1. Create a MongoDB Atlas account
+2. Create a new cluster
+3. Create a database user
+4. Whitelist IP addresses (0.0.0.0/0 for Render)
+5. Get your connection string
+6. Update the `MONGO_URI` in your backend environment variables
 
-### Performance Monitoring
-- Use the monitoring stack for metrics
-- Set up alerts for critical issues
-- Monitor resource usage regularly
+## Domain Configuration (Optional)
 
-## 🎯 Success Criteria
+1. Purchase a custom domain
+2. In Render, go to your frontend service → "Settings" → "Custom Domains"
+3. Add your domain and follow DNS configuration instructions
+4. Update CORS settings in backend to include your custom domain
 
-### Experiment 9 (CI/CD):
-- ✅ Automated testing on push/PR
-- ✅ Automatic deployment to staging/production
-- ✅ Backend deployed on Render
-- ✅ Frontend deployed on Vercel
-- ✅ Environment-specific configurations
+## Monitoring and Logs
 
-### Experiment 10 (Docker DevOps):
-- ✅ Multi-container application setup
-- ✅ Development and production configurations
-- ✅ Database persistence and backups
-- ✅ Health checks and monitoring
-- ✅ Automated deployment scripts
-- ✅ Security best practices
+- Monitor deployments in Render dashboard
+- Check logs for any errors
+- Use the health check endpoint: `https://your-backend-app-name.onrender.com/api/health`
 
-## 🔗 Additional Resources
+## Troubleshooting
 
-- [Docker Documentation](https://docs.docker.com/)
-- [GitHub Actions Documentation](https://docs.github.com/en/actions)
-- [Render Documentation](https://render.com/docs)
-- [Vercel Documentation](https://vercel.com/docs)
-- [MongoDB Docker](https://hub.docker.com/_/mongo)
-- [Nginx Configuration](https://nginx.org/en/docs/)
+### Common Issues:
 
----
+1. **CORS Errors**: Ensure frontend URL is correctly set in backend environment
+2. **Database Connection**: Verify MongoDB Atlas connection string and IP whitelist
+3. **Environment Variables**: Double-check all environment variables are set correctly
+4. **Build Failures**: Check logs for missing dependencies or build errors
 
-**Congratulations! 🎉** You have successfully implemented both CI/CD deployment and Docker DevOps practices for your MealLoop application.
+### Debug Steps:
+
+1. Check Render deployment logs
+2. Verify environment variables are set
+3. Test API endpoints manually
+4. Check browser network tab for failed requests
+
+## Production Best Practices
+
+1. **Security**: Use strong, unique secrets for production
+2. **Monitoring**: Set up error tracking (Sentry, etc.)
+3. **Backups**: Regular MongoDB Atlas backups
+4. **SSL**: Render provides SSL certificates automatically
+5. **Performance**: Monitor response times and optimize as needed
+
+## Automatic Deployments
+
+Once set up, any push to the `main` branch will:
+1. Trigger GitHub Actions workflow
+2. Run tests and build checks
+3. Automatically deploy to Render if successful
+
+Your MealLoop application will be live at:
+- Frontend: `https://your-frontend-app-name.onrender.com`
+- Backend API: `https://your-backend-app-name.onrender.com/api`
