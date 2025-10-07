@@ -17,16 +17,13 @@
     "frontend/mealloop"
   ],
   "dependencies": {
-    "dotenv": "^17.2.2",
-    "framer-motion": "^12.23.12",
-    "mongoose": "^8.18.1",
-    "react-router-dom": "^7.7.1"
+    "dotenv": "^17.2.2"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.0.0",
     "npm": ">=8.0.0"
   }
 }
