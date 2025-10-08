@@ -1,8 +1,17 @@
 // src/services/api.js
 import axios from 'axios';
 
+// Configure API base URL with fallback
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://mealloop-backend.onrender.com/api';
+
+console.log('API Base URL:', API_BASE_URL); // Debug log
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL,
+  baseURL: API_BASE_URL,
+  timeout: 30000, // 30 second timeout for Render cold starts
+  headers: {
+    'Content-Type': 'application/json'
+  }
 });
 
 // Optional: attach token when you add real auth
@@ -11,6 +20,25 @@ api.interceptors.request.use((config) => {
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
+
+// Add response interceptor for better error handling
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    console.error('API Error:', error.response?.data || error.message);
+    
+    // Handle specific error cases
+    if (error.code === 'ECONNREFUSED' || error.code === 'ERR_NETWORK') {
+      console.error('Backend server is not reachable. Please check if the backend is deployed and running.');
+    }
+    
+    if (error.response?.status === 404) {
+      console.error('API endpoint not found:', error.config.url);
+    }
+    
+    return Promise.reject(error);
+  }
+);
 
 export default api;
 

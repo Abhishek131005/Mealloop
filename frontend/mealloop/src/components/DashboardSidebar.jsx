@@ -1,6 +1,7 @@
 import React from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import reactLogo from '../assets/react.svg';
 
 const defaultTabs = [
   { key: "find", label: "Find Donations", icon: "🔍" },
@@ -29,7 +30,7 @@ export default function DashboardSidebar({
       {/* Mini Profile */}
       <div className="flex flex-col items-center py-6 border-b border-gray-200 dark:border-gray-700">
         <img
-          src="/src/assets/react.svg" // Replace with user.avatar or org logo if available
+          src={reactLogo} // Replace with user.avatar or org logo if available
           alt="Avatar"
           className="w-16 h-16 rounded-full mb-2"
         />

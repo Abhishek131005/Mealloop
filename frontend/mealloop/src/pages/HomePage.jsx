@@ -8,21 +8,26 @@ import "swiper/css/pagination";
 import { Pagination, Autoplay } from "swiper/modules";
 import { motion } from 'framer-motion';
 
+// Import images properly for Vite
+import ourMissionImg from '../assets/our_mission.jpg';
+import howItWorksImg from '../assets/how_it_works.png';
+import joinMissionImg from '../assets/join_the_mission.jpg';
+
 const carouselData = [
   {
     title: "Our Mission",
     description: "At MealLoop, we aim to reduce food waste by connecting people who have extra food with those in need.",
-    image: "/src/assets/our_mission.jpg"
+    image: ourMissionImg
   },
   {
     title: "How It Works",
     description: "Donors post leftover food, volunteers pick it up, and together we ensure no meal goes to waste.",
-    image: "/src/assets/how_it_works.png"
+    image: howItWorksImg
   },
   {
     title: "Join the Movement",
     description: "Become a part of a caring community and earn karma points for each successful delivery.",
-    image: "/src/assets/join_the_mission.jpg"
+    image: joinMissionImg
   }
 ];
 
