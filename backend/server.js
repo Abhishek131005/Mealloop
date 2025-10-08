@@ -16,7 +16,9 @@ const corsOptions = {
         process.env.CORS_ORIGIN,
         'https://mealloop-1.onrender.com',
         'https://mealloop-frontend.onrender.com',
-        'https://mealloop-app.onrender.com'
+        'https://mealloop-app.onrender.com',
+        // Add your actual frontend domain here
+        'https://your-frontend-domain.onrender.com'
       ].filter(Boolean)
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
@@ -43,6 +45,23 @@ mongoose.connect(process.env.MONGO_URI)
   .catch(err => console.error('MongoDB error:', err));
 
 app.get('/', (req, res) => res.send('API Running'));
+
+// Base API route
+app.get('/api', (req, res) => {
+  res.json({
+    message: 'MealLoop API is running',
+    status: 'OK',
+    timestamp: new Date().toISOString(),
+    endpoints: [
+      '/api/health',
+      '/api/auth/login',
+      '/api/auth/signup',
+      '/api/donations',
+      '/api/users',
+      '/api/chat'
+    ]
+  });
+});
 
 // Health check endpoint for Render
 app.get('/api/health', async (req, res) => {

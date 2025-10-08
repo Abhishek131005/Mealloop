@@ -7,11 +7,11 @@ const getApiBaseUrl = () => {
   
   // If we're on a Render domain, use the production backend
   if (window.location.hostname.includes('onrender.com')) {
-    return 'https://mealloop-backend.onrender.com/api';
+    return 'https://mealloop.onrender.com/api';
   }
   
   // Otherwise use the environment variable or fallback
-  return envUrl || 'https://mealloop-backend.onrender.com/api';
+  return envUrl || 'https://mealloop.onrender.com/api';
 };
 
 const API_BASE_URL = getApiBaseUrl();
