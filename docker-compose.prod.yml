@@ -1,0 +1,178 @@
+version: '3.8'
+
+services:
+  # Backend Service
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: mealloop-backend-prod
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGODB_URI: ${MONGODB_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+      GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+      REDIS_URL: redis://redis:6379
+    expose:
+      - "5000"
+    volumes:
+      - ./backend/public/uploads:/app/public/uploads
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - mealloop-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Frontend Service
+  frontend:
+    build:
+      context: ./frontend/mealloop
+      dockerfile: Dockerfile
+      target: production
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        VITE_GOOGLE_MAPS_API_KEY: ${GOOGLE_MAPS_API_KEY}
+        VITE_CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME}
+        VITE_CLOUDINARY_UPLOAD_PRESET: ${CLOUDINARY_UPLOAD_PRESET}
+    container_name: mealloop-frontend-prod
+    restart: unless-stopped
+    expose:
+      - "3000"
+    networks:
+      - mealloop-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7.2-alpine
+    container_name: mealloop-redis-prod
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mealloop-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Nginx Reverse Proxy & Load Balancer
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: mealloop-nginx-prod
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/prod.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    depends_on:
+      frontend:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    networks:
+      - mealloop-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Monitoring with Prometheus (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mealloop-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - mealloop-network
+    profiles:
+      - monitoring
+
+  # Monitoring with Grafana (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mealloop-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - mealloop-network
+    profiles:
+      - monitoring
+
+volumes:
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
+networks:
+  mealloop-network:
+    driver: bridge

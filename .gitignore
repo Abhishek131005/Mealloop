@@ -69,3 +69,26 @@ Thumbs.db
 
 # Render build files
 .render/
+
+# Docker
+docker-compose.override.yml
+.docker/
+
+# Monitoring data
+monitoring/data/
+prometheus_data/
+grafana_data/
+
+# SSL certificates
+nginx/ssl/
+*.pem
+*.key
+*.crt
+
+# Backup files
+backup_*.gz
+*.backup
+
+# Local environment overrides
+.env.override
+docker-compose.local.yml

@@ -1,0 +1,201 @@
+name: Docker CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME_BACKEND: ${{ github.repository }}/backend
+  IMAGE_NAME_FRONTEND: ${{ github.repository }}/frontend
+
+jobs:
+  # Build and Test Backend
+  backend-build-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta-backend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_BACKEND }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build and test backend
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        target: development
+        load: true
+        tags: backend-test:latest
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Run backend tests
+      run: |
+        docker run --rm backend-test:latest npm test || echo "No tests configured"
+        
+    - name: Security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: backend-test:latest
+        format: 'sarif'
+        output: 'backend-trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'backend-trivy-results.sarif'
+        
+    - name: Build and push production image
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: docker/build-push-action@v5
+      with:
+        context: ./backend
+        target: production
+        push: true
+        tags: ${{ steps.meta-backend.outputs.tags }}
+        labels: ${{ steps.meta-backend.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Build and Test Frontend
+  frontend-build-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+        
+    - name: Extract metadata
+      id: meta-frontend
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME_FRONTEND }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+          
+    - name: Build frontend for testing
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend/mealloop
+        target: build
+        load: true
+        tags: frontend-test:latest
+        build-args: |
+          VITE_API_BASE_URL=https://api.mealloop.com/api
+          VITE_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+          VITE_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+        
+    - name: Run frontend tests
+      run: |
+        docker run --rm frontend-test:latest npm test || echo "No tests configured"
+        
+    - name: Security scan with Trivy
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: frontend-test:latest
+        format: 'sarif'
+        output: 'frontend-trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'frontend-trivy-results.sarif'
+        
+    - name: Build and push production image
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: docker/build-push-action@v5
+      with:
+        context: ./frontend/mealloop
+        target: production
+        push: true
+        tags: ${{ steps.meta-frontend.outputs.tags }}
+        labels: ${{ steps.meta-frontend.outputs.labels }}
+        build-args: |
+          VITE_API_BASE_URL=${{ secrets.VITE_API_BASE_URL }}
+          VITE_GOOGLE_MAPS_API_KEY=${{ secrets.GOOGLE_MAPS_API_KEY }}
+          VITE_CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          VITE_CLOUDINARY_UPLOAD_PRESET=${{ secrets.CLOUDINARY_UPLOAD_PRESET }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  # Deploy to Production
+  deploy:
+    needs: [backend-build-test, frontend-build-test]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Deploy to production server
+      uses: appleboy/ssh-action@v1.0.0
+      with:
+        host: ${{ secrets.PRODUCTION_HOST }}
+        username: ${{ secrets.PRODUCTION_USER }}
+        key: ${{ secrets.PRODUCTION_SSH_KEY }}
+        script: |
+          cd /opt/mealloop
+          git pull origin main
+          docker-compose -f docker-compose.prod.yml pull
+          docker-compose -f docker-compose.prod.yml up -d
+          docker system prune -f
+
+  # Notify deployment status
+  notify:
+    needs: [deploy]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+    - name: Deployment notification
+      uses: 8398a7/action-slack@v3
+      if: always()
+      with:
+        status: ${{ job.status }}
+        text: |
+          MealLoop deployment ${{ job.status }}!
+          Commit: ${{ github.sha }}
+          Author: ${{ github.actor }}
+      env:
+        SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

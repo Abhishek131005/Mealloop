@@ -1,9 +1,22 @@
 // src/services/api.js
 import axios from 'axios';
 
-// Configure API base URL with fallback
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://mealloop-backend.onrender.com/api';
+// Configure API base URL with production fallback
+const getApiBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+  
+  // If we're on a Render domain, use the production backend
+  if (window.location.hostname.includes('onrender.com')) {
+    return 'https://mealloop-backend.onrender.com/api';
+  }
+  
+  // Otherwise use the environment variable or fallback
+  return envUrl || 'https://mealloop-backend.onrender.com/api';
+};
 
+const API_BASE_URL = getApiBaseUrl();
+
+console.log('Current hostname:', window.location.hostname);
 console.log('API Base URL:', API_BASE_URL); // Debug log
 
 const api = axios.create({

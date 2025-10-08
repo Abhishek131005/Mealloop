@@ -14,8 +14,8 @@ services:
       - key: VITE_API_BASE_URL
         value: https://mealloop-backend.onrender.com/api
       - key: VITE_CLOUDINARY_CLOUD_NAME
-        sync: false
+        value: ddiqp1bzn
       - key: VITE_CLOUDINARY_UPLOAD_PRESET
-        sync: false
+        value: mealloop_preset
       - key: VITE_GOOGLE_MAPS_API_KEY
-        sync: false
+        value: AIzaSyAOmY0mUFLHWgl5MCaBsGvpDucrH5mwLr8

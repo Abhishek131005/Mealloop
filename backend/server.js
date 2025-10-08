@@ -11,14 +11,31 @@ const app = express();
 // CORS configuration
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL, process.env.CORS_ORIGIN].filter(Boolean)
+    ? [
+        process.env.FRONTEND_URL, 
+        process.env.CORS_ORIGIN,
+        'https://mealloop-1.onrender.com',
+        'https://mealloop-frontend.onrender.com',
+        'https://mealloop-app.onrender.com'
+      ].filter(Boolean)
     : ['http://localhost:3000', 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
+  preflightContinue: false,
+  optionsSuccessStatus: 200
 };
 
 app.use(cors(corsOptions));
+
+// Debug CORS
+app.use((req, res, next) => {
+  console.log('Origin:', req.get('Origin'));
+  console.log('Method:', req.method);
+  console.log('URL:', req.url);
+  next();
+});
+
 app.use(express.json());
 
 mongoose.connect(process.env.MONGO_URI)
@@ -28,13 +45,32 @@ mongoose.connect(process.env.MONGO_URI)
 app.get('/', (req, res) => res.send('API Running'));
 
 // Health check endpoint for Render
-app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    status: 'OK',
-    message: 'MealLoop Backend is running',
-    timestamp: new Date().toISOString(),
-    environment: process.env.NODE_ENV || 'development'
-  });
+app.get('/api/health', async (req, res) => {
+  try {
+    // Check database connection
+    const dbStatus = mongoose.connection.readyState === 1 ? 'connected' : 'disconnected';
+    
+    // Basic health info
+    const healthInfo = {
+      status: 'OK',
+      message: 'MealLoop Backend is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+      database: dbStatus,
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      version: process.version
+    };
+
+    res.status(200).json(healthInfo);
+  } catch (error) {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Health check failed',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 const donationRoutes = require('./routes/donations');
