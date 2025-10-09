@@ -10,14 +10,19 @@
     "dev:frontend": "cd frontend/mealloop && npm run dev",
     "dev:backend": "cd backend && npm run dev",
     "install:all": "npm install && cd backend && npm install && cd ../frontend/mealloop && npm install",
-    "postinstall": "echo 'Root dependencies installed. Run npm run install:all to install all project dependencies.'"
+    "postinstall": "echo 'Root dependencies installed. Run npm run install:all to install all project dependencies.'",
+    "export-data": "node scripts/export-data.js",
+    "import-data": "node scripts/import-data.js",
+    "migrate-db": "npm run export-data && npm run import-data",
+    "test-atlas": "node scripts/test-atlas-connection.js"
   },
   "workspaces": [
     "backend",
     "frontend/mealloop"
   ],
   "dependencies": {
-    "dotenv": "^17.2.2"
+    "dotenv": "^17.2.2",
+    "mongodb": "^6.20.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2"

@@ -6,13 +6,74 @@ const bcrypt = require('bcryptjs');
 
 // Signup
 router.post('/signup', async (req, res) => {
-  const { name, email, password, role } = req.body;
-  const existing = await User.findOne({ email });
-  if (existing) return res.status(400).json({ error: 'Email already registered' });
-  const hash = await bcrypt.hash(password, 10);
-  const user = new User({ name, email, password: hash, role });
-  await user.save();
-  res.status(201).json({ message: 'Signup successful' });
+  try {
+    const { name, email, password, role } = req.body;
+    
+    // Validation
+    if (!name || !email || !password) {
+      return res.status(400).json({ 
+        error: 'Name, email, and password are required' 
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({ 
+        error: 'Password must be at least 6 characters long' 
+      });
+    }
+
+    // Check if user already exists
+    const existing = await User.findOne({ email: email.toLowerCase() });
+    if (existing) {
+      return res.status(400).json({ 
+        error: 'Email already registered' 
+      });
+    }
+
+    // Hash password
+    const hash = await bcrypt.hash(password, 12);
+    
+    // Create user
+    const user = new User({ 
+      name: name.trim(),
+      email: email.toLowerCase().trim(),
+      password: hash,
+      role: role || 'Donor'
+    });
+    
+    await user.save();
+    
+    console.log('✅ User created successfully:', user._id);
+    res.status(201).json({ 
+      message: 'Signup successful',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role
+      }
+    });
+    
+  } catch (error) {
+    console.error('❌ Signup error:', error);
+    
+    if (error.code === 11000) {
+      return res.status(400).json({ 
+        error: 'Email already registered' 
+      });
+    }
+    
+    if (error.name === 'ValidationError') {
+      const messages = Object.values(error.errors).map(e => e.message);
+      return res.status(400).json({ 
+        error: messages.join('. ') 
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Server error during signup' 
+    });
+  }
 });
 
 // Login
