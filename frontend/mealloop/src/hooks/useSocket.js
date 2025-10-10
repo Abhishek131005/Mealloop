@@ -16,6 +16,7 @@ export default function useSocket() {
       return;
     }
     
+    // Use API base URL and strip '/api' to get the socket URL
     const url = import.meta.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:5000';
     console.log('Connecting to socket at:', url, 'for user:', user.id);
     

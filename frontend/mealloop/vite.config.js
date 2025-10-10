@@ -13,6 +13,11 @@ export default defineConfig(({ mode }) => {
       react(),
       tailwindcss(),
     ],
+    server: {
+      host: '0.0.0.0',
+      port: 5173,
+      open: false, // Disable auto-opening browser
+    },
     define: {
       // Make environment variables available in the client-side code
       'process.env': {

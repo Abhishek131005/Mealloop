@@ -99,7 +99,8 @@ export default function DonorDashboard() {
               _id: user.id,
               name: user.name,
               email: user.email
-            }
+            },
+            claimedBy: d.claimedBy // Preserve the claimedBy field with populated data
           }));
           setDonations(processedDonations.filter(d => d.status !== 'Delivered'));
           setDelivered(processedDonations.filter(d => d.status === 'Delivered'));
@@ -373,6 +374,8 @@ export default function DonorDashboard() {
       markAsRead(chatDonationId);
     }
     setChatOpen(false);
+    setChatDonationId(null);
+    setChatPeer(null);
     setChatRefreshTrigger(prev => prev + 1);
     refreshUnreadCount();
   };
@@ -568,7 +571,19 @@ export default function DonorDashboard() {
                                 e.stopPropagation();
                                 // Get the volunteer info directly from the donation object
                                 try {
+                                  console.log('Opening chat - Donation:', d);
+                                  console.log('ClaimedBy:', d.claimedBy);
+                                  console.log('Current user:', user);
+                                  
                                   if (d.claimedBy && d.claimedBy._id) {
+                                    // Ensure we're not trying to chat with ourselves
+                                    if (d.claimedBy._id === user.id || d.claimedBy._id === user._id) {
+                                      console.error('Cannot chat with yourself - claimedBy ID matches current user');
+                                      alert('Error: Cannot start chat with yourself. The volunteer info may be incorrect.');
+                                      return;
+                                    }
+                                    
+                                    console.log('Setting chat peer to volunteer:', d.claimedBy);
                                     setChatDonationId(d._id || d.id);
                                     setChatPeer({
                                       id: d.claimedBy._id,
@@ -578,6 +593,7 @@ export default function DonorDashboard() {
                                     });
                                     setChatOpen(true);
                                   } else {
+                                    console.error('ClaimedBy information missing:', d.claimedBy);
                                     alert('Volunteer information not available. Please refresh the page.');
                                   }
                                 } catch (err) {

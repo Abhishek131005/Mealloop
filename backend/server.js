@@ -21,7 +21,12 @@ const corsOptions = {
         'https://mealloop-frontend.onrender.com',
         'https://mealloop-app.onrender.com'
       ].filter(Boolean)
-    : ['http://localhost:3000', 'http://localhost:5173'],
+    : [
+        'http://localhost:3000', 
+        'http://localhost:5173',
+        'http://frontend:5173',  // Docker container service name
+        process.env.FRONTEND_URL // Use environment variable if set
+      ].filter(Boolean),
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'Origin', 'X-Requested-With'],
@@ -38,6 +43,11 @@ app.use((req, res, next) => {
 });
 
 app.use(express.json());
+
+// Health check endpoint for Docker
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', message: 'MealLoop server is running', timestamp: new Date().toISOString() });
+});
 
 // Enhanced MongoDB Atlas connection
 const connectDB = async () => {
@@ -87,7 +97,12 @@ const io = new Server(server, {
           'https://mealloop-frontend.onrender.com',
           'https://mealloop-app.onrender.com'
         ].filter(Boolean)
-      : ['http://localhost:3000', 'http://localhost:5173'],
+      : [
+          'http://localhost:3000', 
+          'http://localhost:5173',
+          'http://frontend:5173',  // Docker container service name
+          process.env.FRONTEND_URL // Use environment variable if set
+        ].filter(Boolean),
     methods: ['GET', 'POST'],
     credentials: true
   }

@@ -1,5 +1,5 @@
 # Multi-stage build for backend
-FROM node:20.18.0-alpine AS base
+FROM node:20.19.0-alpine AS base
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -10,8 +10,8 @@ WORKDIR /app
 # Copy package files for dependency installation
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install dependencies - using install for better compatibility
+RUN npm install --production && npm cache clean --force
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
@@ -22,8 +22,8 @@ RUN addgroup -g 1001 -S nodejs && \
 # ============================
 FROM base AS development
 
-# Install dev dependencies
-RUN npm ci
+# Install dev dependencies including devDependencies
+RUN npm install && npm cache clean --force
 
 # Copy source code
 COPY --chown=nodeuser:nodejs . .

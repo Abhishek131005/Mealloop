@@ -1,5 +1,5 @@
 # Multi-stage build for frontend
-FROM node:20.18.0-alpine AS base
+FROM node:20.19.0-alpine AS base
 
 # Install dumb-init for proper signal handling
 RUN apk add --no-cache dumb-init
@@ -15,8 +15,8 @@ FROM base AS deps
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --frozen-lockfile
+# Install dependencies - using install instead of ci to update package-lock.json
+RUN npm install && npm cache clean --force
 
 # ============================
 # Build stage
@@ -81,6 +81,9 @@ CMD ["nginx", "-g", "daemon off;"]
 # ============================
 FROM base AS development
 
+# Install netcat for healthcheck
+RUN apk add --no-cache netcat-openbsd
+
 # Copy dependencies from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
@@ -100,9 +103,9 @@ USER nodeuser
 # Expose port
 EXPOSE 5173
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:5173/ || exit 1
+# Health check - using nc (netcat) instead of wget
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD nc -z localhost 5173 || exit 1
 
-# Start development server
-CMD ["dumb-init", "npm", "run", "dev", "--", "--host", "0.0.0.0"]
+# Start development server with no browser opening
+CMD ["dumb-init", "npm", "run", "dev"]
