@@ -34,6 +34,30 @@ export default function VolunteerDashboard() {
   
   const center = pos ? { lat: pos.lat, lng: pos.lng } : null;
 
+  // Show loading if user is not yet loaded
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user has the right role
+  if (user.role !== 'volunteer') {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Access Denied</h2>
+          <p className="text-gray-500 dark:text-gray-400">This dashboard is for volunteers only.</p>
+        </div>
+      </div>
+    );
+  }
+
   // Fetch user data and donations
   useEffect(() => {
     const fetchUserData = async () => {
@@ -86,21 +110,8 @@ export default function VolunteerDashboard() {
   // Handle donation selection
   const handleDonationSelect = (donation) => {
     setSelectedDonation(donation);
-    setChatDonationId(donation._id || donation.id);
-    
-    // For volunteers, the peer is always the donor
-    if (donation.donor) {
-      const peer = {
-        id: donation.donor._id || donation.donor.id,
-        _id: donation.donor._id || donation.donor.id,
-        name: donation.donor.name,
-        email: donation.donor.email
-      };
-      setChatPeer(peer);
-      setChatOpen(true);
-    } else {
-      alert('Donor information not available. Please refresh and try again.');
-    }
+    // Don't automatically open chat when selecting donation
+    // The user should click the chat button explicitly
   };
 
   // Handle claiming a donation
@@ -273,6 +284,8 @@ export default function VolunteerDashboard() {
                 markAsRead(chatDonationId);
               }
               setChatOpen(false);
+              setChatDonationId(null);
+              setChatPeer(null);
               setChatRefreshTrigger(prev => prev + 1);
               refreshUnreadCount();
             }}
@@ -476,9 +489,12 @@ export default function VolunteerDashboard() {
                                   </button>
                                   <button
                                     onClick={() => {
-                                      setChatDonationId(selectedDonation._id || selectedDonation.id);
                                       // For volunteers, the peer is always the donor
                                       if (selectedDonation.donor) {
+                                        console.log('Opening chat with donor:', selectedDonation.donor);
+                                        console.log('Current user (volunteer):', user);
+                                        
+                                        setChatDonationId(selectedDonation._id || selectedDonation.id);
                                         setChatPeer({
                                           id: selectedDonation.donor._id,
                                           _id: selectedDonation.donor._id,
@@ -584,6 +600,9 @@ export default function VolunteerDashboard() {
                         <div className="mt-4">
                           <button
                             onClick={() => {
+                              console.log('View Details & Chat clicked for donation:', donation);
+                              console.log('Donor info:', donation.donor);
+                              
                               // Open chat window with donor
                               setChatDonationId(donation._id || donation.id);
                               if (donation.donor) {
@@ -593,8 +612,10 @@ export default function VolunteerDashboard() {
                                   name: donation.donor.name,
                                   email: donation.donor.email
                                 });
+                                setChatOpen(true);
+                              } else {
+                                alert('Donor information not available. Please refresh and try again.');
                               }
-                              setChatOpen(true);
                               // Also open the details modal
                               handleDonationSelect(donation);
                             }}

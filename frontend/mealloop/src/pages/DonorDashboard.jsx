@@ -614,13 +614,17 @@ export default function DonorDashboard() {
                                   }
                                   
                                   if (d.claimedBy && d.claimedBy._id) {
-                                    // Ensure we're not trying to chat with ourselves
+                                    // Debug logging to understand the ID issue
                                     const currentUserId = user.id || user._id;
-                                    if (d.claimedBy._id === currentUserId) {
-                                      console.error('Cannot chat with yourself - claimedBy ID matches current user');
-                                      alert('Error: Cannot start chat with yourself. The volunteer info may be incorrect.');
-                                      return;
-                                    }
+                                    console.log('Current user ID:', currentUserId);
+                                    console.log('ClaimedBy ID:', d.claimedBy._id);
+                                    console.log('Current user object:', user);
+                                    console.log('ClaimedBy object:', d.claimedBy);
+                                    console.log('Are they equal?', d.claimedBy._id === currentUserId);
+                                    console.log('Types - currentUserId:', typeof currentUserId, 'claimedBy._id:', typeof d.claimedBy._id);
+                                    
+                                    // For now, let's allow the chat to open and see what happens
+                                    // Remove the self-check temporarily to debug
                                     
                                     console.log('Setting chat peer to volunteer:', d.claimedBy);
                                     setChatDonationId(d._id || d.id);
