@@ -110,11 +110,24 @@ export default function DonorDashboard() {
         console.log('Fetching donations with token:', token.substring(0, 10) + '...');
         const donations = await getMyDonations();
         console.log('Donations API response:', donations);
+        console.log('Raw donations before processing:', JSON.stringify(donations, null, 2));
         
         if (donations) {
           // Ensure we have an array
           const donationsArray = Array.isArray(donations) ? donations : [donations];
           console.log(`Found ${donationsArray.length} donations for user`);
+          
+          // Log each donation's claimedBy field
+          donationsArray.forEach((d, index) => {
+            console.log(`Donation ${index}:`);
+            console.log(`  - ID: ${d._id}`);
+            console.log(`  - Title: ${d.title}`);
+            console.log(`  - Status: ${d.status}`);
+            console.log(`  - ClaimedBy:`, d.claimedBy);
+            console.log(`  - Donor:`, d.donor);
+            console.log(`  - Should show chat button: ${(d.status === 'Claimed' || d.status === 'Picked Up') && d.claimedBy}`);
+          });
+          
           // Process the donations data
           const processedDonations = donationsArray.map(d => ({
             ...d,
@@ -616,15 +629,26 @@ export default function DonorDashboard() {
                                   if (d.claimedBy && d.claimedBy._id) {
                                     // Debug logging to understand the ID issue
                                     const currentUserId = user.id || user._id;
+                                    console.log('=== CHAT DEBUG INFO ===');
                                     console.log('Current user ID:', currentUserId);
                                     console.log('ClaimedBy ID:', d.claimedBy._id);
                                     console.log('Current user object:', user);
                                     console.log('ClaimedBy object:', d.claimedBy);
+                                    console.log('Donation object:', d);
                                     console.log('Are they equal?', d.claimedBy._id === currentUserId);
                                     console.log('Types - currentUserId:', typeof currentUserId, 'claimedBy._id:', typeof d.claimedBy._id);
+                                    console.log('Setting up chat with peer:', {
+                                      id: d.claimedBy._id,
+                                      _id: d.claimedBy._id,
+                                      name: d.claimedBy.name,
+                                      email: d.claimedBy.email
+                                    });
+                                    console.log('=== END CHAT DEBUG ===');
                                     
-                                    // For now, let's allow the chat to open and see what happens
-                                    // Remove the self-check temporarily to debug
+                                    // Alert if claimedBy seems to be the same as current user
+                                    if (d.claimedBy._id === currentUserId || d.claimedBy.name === user.name) {
+                                      alert(`Warning: ClaimedBy appears to be the same as current user!\nCurrent: ${user.name} (${currentUserId})\nClaimedBy: ${d.claimedBy.name} (${d.claimedBy._id})\nThis donation may not have been properly claimed by a volunteer.`);
+                                    }
                                     
                                     console.log('Setting chat peer to volunteer:', d.claimedBy);
                                     setChatDonationId(d._id || d.id);

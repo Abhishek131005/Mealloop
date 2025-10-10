@@ -20,6 +20,14 @@ export default function ChatWindow({ donationId, user, peer, onClose, onMessageR
   const typingTimeoutRef = useRef(null);
   const { showChatNotification } = useNotifications();
 
+  // Debug logging for ChatWindow props
+  console.log('=== CHATWINDOW DEBUG ===');
+  console.log('ChatWindow received - donationId:', donationId);
+  console.log('ChatWindow received - user:', user);
+  console.log('ChatWindow received - peer:', peer);
+  console.log('User name:', user?.name, 'Peer name:', peer?.name);
+  console.log('=== END CHATWINDOW DEBUG ===');
+
   // Monitor socket connection status
   useEffect(() => {
     const socket = socketRef.current;
