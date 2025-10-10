@@ -8,6 +8,7 @@ import TimePicker from '../components/TimePicker';
 import { format } from 'date-fns';
 import DashboardSidebar from '../components/DashboardSidebar';
 import { GlobalContext } from '../context/GlobalContext';
+import { useAuth } from '../context/AuthContext';
 import { useNotificationContext } from '../context/NotificationContext';
 import UploadImage from '../components/UploadImage';
 import useGeolocation from '../hooks/useGeolocation';
@@ -25,7 +26,8 @@ export default function DonorDashboard() {
   const [editDonation, setEditDonation] = useState(null);
   const [newDonationCount, setNewDonationCount] = useState(0);
   const [selectedDonation, setSelectedDonation] = useState(null);
-  const { user, location, setLocation } = useContext(GlobalContext);
+  const { location, setLocation } = useContext(GlobalContext);
+  const { user } = useAuth(); // Use AuthContext instead of GlobalContext for user
   const { unreadCount, refreshUnreadCount } = useNotificationContext();
   const { unreadCounts, markAsRead } = useMessageNotifications();
   const [activeTab, setActiveTab] = useState('post');
@@ -37,6 +39,35 @@ export default function DonorDashboard() {
   const [loading, setLoading] = useState(false);
   const [isLoadingDonations, setIsLoadingDonations] = useState(true);
   const [error, setError] = useState(null);
+
+  // Show loading if user is not yet loaded
+  if (!user) {
+    console.log('DonorDashboard: User is null/undefined');
+    console.log('LocalStorage user:', localStorage.getItem('user'));
+    console.log('LocalStorage token:', localStorage.getItem('jwt_token'));
+    
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500 dark:text-gray-400">Loading dashboard...</p>
+          <p className="text-xs text-gray-400 mt-2">Please make sure you are logged in</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Check if user has the right role
+  if (user.role !== 'donor') {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold text-gray-800 dark:text-white mb-4">Access Denied</h2>
+          <p className="text-gray-500 dark:text-gray-400">This dashboard is for donors only.</p>
+        </div>
+      </div>
+    );
+  }
 
   // form local state
   const [form, setForm] = useState({
@@ -64,7 +95,7 @@ export default function DonorDashboard() {
     }
     
     const fetchDonations = async () => {
-      console.log(`Fetching donations for user: ${user.id} (${user.email})`);
+      console.log(`Fetching donations for user: ${user.id || user._id} (${user.email})`);
       setIsLoadingDonations(true);
       setError(null);
       
@@ -563,7 +594,7 @@ export default function DonorDashboard() {
                             {d.status || 'pending'}
                           </span>
                           {/* Chat with Volunteer button for claimed or picked up donations (not delivered) */}
-                          {(d.status === 'Claimed' || d.status === 'Picked Up') && d.claimedBy && (
+                          {(d.status === 'Claimed' || d.status === 'Picked Up') && d.claimedBy && user && (user.id || user._id) && (
                             <button
                               type="button"
                               className="ml-2 mt-2 bg-gradient-to-r from-pink-500 to-pink-600 hover:from-pink-600 hover:to-pink-700 text-white font-medium py-1 px-3 rounded text-xs"
@@ -575,9 +606,17 @@ export default function DonorDashboard() {
                                   console.log('ClaimedBy:', d.claimedBy);
                                   console.log('Current user:', user);
                                   
+                                  // Check if user is loaded
+                                  if (!user || !(user.id || user._id)) {
+                                    console.error('User not loaded or missing ID');
+                                    alert('Please wait for the page to fully load and try again.');
+                                    return;
+                                  }
+                                  
                                   if (d.claimedBy && d.claimedBy._id) {
                                     // Ensure we're not trying to chat with ourselves
-                                    if (d.claimedBy._id === user.id || d.claimedBy._id === user._id) {
+                                    const currentUserId = user.id || user._id;
+                                    if (d.claimedBy._id === currentUserId) {
                                       console.error('Cannot chat with yourself - claimedBy ID matches current user');
                                       alert('Error: Cannot start chat with yourself. The volunteer info may be incorrect.');
                                       return;
